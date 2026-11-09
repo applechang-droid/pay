@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>訂單付款</title>
+<style>
+:root{
+  --bg:#eef2f4; --surface:#ffffff; --text:#17242b; --muted:#5f6f78; --border:#d6dee2;
+  --accent:#14606b; --ok:#2c7a4b; --warn:#94600f; --warn-soft:#fbf0d9;
+  --pay:#0f3d45; --pay-ink:#f1fbfc; --pay-muted:#a9cfd5;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#121a1e; --surface:#1a252a; --text:#e4ecef; --muted:#93a5ad; --border:#2e3f46;
+    --accent:#4bb0bb; --ok:#6cc893; --warn:#e3b45c; --warn-soft:#3a2f18;
+    --pay:#0c2d33; --pay-ink:#eafafc; --pay-muted:#8fbcc3;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:var(--bg);color:var(--text);font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;font-size:16px;line-height:1.5}
+button{font:inherit}
+main{max-width:480px;margin:0 auto;padding:16px 14px 40px}
+.num{font-variant-numeric:tabular-nums}
+.head{display:flex;justify-content:space-between;align-items:baseline;margin:4px 2px 12px}
+.head h1{font-size:20px;margin:0}
+.head .sub{font-size:13px;color:var(--muted)}
+.banner{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:12px 14px;font-weight:600;margin-bottom:14px;font-size:15px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px}
+.item{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.item:last-of-type{border-bottom:0}
+.item .n{flex:1}
+.item .q{color:var(--muted);font-size:14px}
+.item .s{font-weight:600;white-space:nowrap}
+.total{display:flex;justify-content:space-between;align-items:baseline;padding-top:10px;margin-top:4px;border-top:2px solid var(--text)}
+.total b{font-size:28px}
+.pay{background:var(--pay);color:var(--pay-ink);border-radius:12px;padding:16px;margin-bottom:14px}
+.pay h2{font-size:16px;margin:0 0 6px}
+.prow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.15)}
+.prow:last-child{border-bottom:0}
+.lbl{color:var(--pay-muted);font-size:13px}
+.val{font-size:20px;font-weight:700;word-break:break-all}
+.val.big{font-size:28px}
+.copy{flex:none;background:var(--pay-ink);color:var(--pay);border:0;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;min-width:74px}
+.copy.done{background:var(--ok);color:#fff}
+.note{font-size:14px;color:var(--muted);margin:0 4px}
+.center{text-align:center;color:var(--muted);padding:70px 16px}
+</style>
+</head>
+<body>
+<main id="app"><div class="center">載入中…</div></main>
+<script>
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+const money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
+const fmtAcct=a=>String(a||'').replace(/(\d{4})(?=\d)/g,'$1 ');
+const app=document.getElementById('app');
+
+function decode(){
+  const m=location.hash.match(/[#&]d=([A-Za-z0-9_-]+)/);
+  if(!m)return null;
+  let b=m[1].replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';
+  const bin=atob(b),bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  const d=JSON.parse(new TextDecoder().decode(bytes));
+  if(!d||!Array.isArray(d.i)||!Array.isArray(d.b))return null;
+  return d;
+}
+
+function render(){
+  let d=null;
+  try{d=decode()}catch(e){}
+  if(!d){app.innerHTML='<div class="center">請掃描結帳人員提供的 QR Code 查看你的訂單。</div>';return}
+  const [code,bankName,acct,acctName]=d.b;
+  const qty=d.i.reduce((s,x)=>s+(+x[2]||0),0);
+  app.innerHTML=`
+    <div class="head"><h1>訂單確認</h1><span class="sub num">${esc(d.n||'')}</span></div>
+    <div class="banner">請核對品項和金額，再依下方資訊轉帳。轉帳完成後，請把畫面給結帳人員確認。</div>
+    <div class="card">
+      ${d.i.map(x=>`<div class="item"><div class="n">${esc(x[0])}<div class="q num">${money(x[1])} × ${esc(x[2])}</div></div><div class="s num">${money(x[1]*x[2])}</div></div>`).join('')}
+      <div class="total"><span>共 ${qty} 件，應付金額</span><b class="num">${money(d.t)}</b></div>
+    </div>
+    <div class="pay">
+      <h2>匯款資訊</h2>
+      <div class="prow"><div><div class="lbl">銀行代碼</div><div class="val num">${esc(code)}　<span style="font-size:15px;font-weight:600">${esc(bankName)}</span></div></div><button class="copy" data-copy="${esc(code)}">複製</button></div>
+      <div class="prow"><div><div class="lbl">帳號</div><div class="val big num">${esc(fmtAcct(acct))}</div></div><button class="copy" data-copy="${esc(acct)}">複製</button></div>
+      ${acctName?`<div class="prow"><div><div class="lbl">戶名</div><div style="font-weight:600">${esc(acctName)}</div></div></div>`:''}
+      <div class="prow"><div><div class="lbl">轉帳金額</div><div class="val big num">${money(d.t)}</div></div><button class="copy" data-copy="${esc(d.t)}">複製</button></div>
+    </div>
+    <p class="note">按「複製」可以直接貼到銀行 App。</p>`;
+  app.querySelectorAll('.copy').forEach(b=>b.onclick=()=>copyText(b.dataset.copy,b));
+}
+
+function copyText(text,btn){
+  const done=()=>{btn.textContent='已複製';btn.classList.add('done');setTimeout(()=>{btn.textContent='複製';btn.classList.remove('done')},1600)};
+  const fallback=()=>{const t=document.createElement('textarea');t.value=text;t.setAttribute('readonly','');t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();t.setSelectionRange(0,99999);
+    let ok=false;try{ok=document.execCommand('copy')}catch(e){}t.remove();if(ok)done();else btn.textContent=text};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(done,fallback);else fallback();
+}
+
+render();
+window.addEventListener('hashchange',render);
+</script>
+</body>
+</html>
